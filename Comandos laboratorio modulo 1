@@ -1,0 +1,70 @@
+========Laboratorios del Modulo l==============================
+
+
+========Comandos Utilizados en la Práctica 1===============
+
+Sudo hostnamectl set-hostname 20250826
+hostnamectl
+
+========Comandos Utilizados en la Práctica 2===============
+
+systemctl status NetworkManager
+ip link show
+ip route show default
+nmcli device status
+ip route show default
+clear
+systemctl status NetworkManager
+ip link show
+ip route show default
+nmcli device status
+nmcli connection show
+sudo nmcli connection add type ethernet con-name "MiConexion-DHCP" ifname ens160 ipv4.method auto
+sudo nmcli connection up "MiConexion-DHCP"
+nmcli connection show --active
+ip route show
+sudo nmcli connection add type ethernet con-name "MiConexion-Estatica" ifname ens160 ipv4.addresses 192.168.1.100/24 ipv4.gateway 192.168.1.1 ipv4.dns "8.8.8.8 8.8.4.4" ipv4.method manual 
+sudo nmcli connection up "MiConexion-Estatica"
+ip addr show ens160
+cat /etc/resolv.conf
+ls -l /etc/sysconfig/network-scripts/
+cat /etc/sysconfig/network-scripts/ifcfg-ens160
+sudo nano /etc/sysconfig/network-scripts/ifcfg-ens160
+sudo nmtui
+nmcli connection show ens160
+
+
+========Comandos Utilizados en la Práctica 3===============
+
+sudo useradd luismendez
+sudo passwd luismendez
+sudo usermod -aG wheel luismendez
+groups luismendez
+sudo groupadd guest
+sudo useradd -G guest visitante
+sudo passwd visitante
+groups visitante
+sudo userdel -r visitante
+sudo groupdel -r guest(Incorrecta)
+sudo groupdel guest(Correción)
+getent group guest
+
+
+
+========Comandos Utilizados en la Práctica 4===============
+mkdir materia
+cd materia
+vi estudiante.txt
+cat estudiante.txt
+chmod 700 estudiante.txt
+ls -l estudiante.txt
+chmod 070 estudiante.txt
+ls -l estudiante.txt
+cd ..
+mkdir materia2
+cp materia/estudiante.txt materia2/
+chmod 700 materia/estudiante.txt
+cp materia/estudiante.txt materia2/
+ls materia2
+rm -r materia
+ls materia
