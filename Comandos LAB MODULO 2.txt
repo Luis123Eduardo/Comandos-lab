@@ -1,0 +1,53 @@
+=============Laboratorio del Modulo 2===========
+
+====================Práctica 1===================
+
+sudo dnf update -y && sudo dnf upgrade -y
+sudo dnf repolist all
+sudo dnf search bashtop
+sudo dnf install git -y
+cd /tmp
+git clone https://github.com/aristocratos/bashtop.git
+sudo cp bashtop/bashtop /usr/local/bin/
+sudo chmod +x /usr/local/bin/bashtop
+bashtop
+sudo dnf remove bashtop -y
+sudo dnf autoremove -y
+sudo dnf clean all
+sudo rm -rf /tmp/bashtop
+bashtop
+rm -r bashtop
+
+
+====================Práctica 2===================
+
+nano /etc/crontab
+crontab -e
+crontab -l
+nano crontab -e (aquí no hice nada)
+crontab -e
+crontab -l
+sudo su
+
+
+====================Práctica 3===================
+cd ~/Escritorio
+exit
+cd /Escritorio
+clear
+lsblk
+sudo fdisk /dev/nvme0n2
+lsblk
+sudo mkfs.ext4 /dev/nvme0n2p1
+cd ~/Escritorio
+mkdir Disco20GB
+sudo mount /dev/nvme0n2p1
+sudo mount /dev/nvme0n2p1 ~/Escritorio/Disco20GB
+cd ~/Escritorio/Disco20GB
+sudo touch AdrianAlcantara.txt
+ls
+cd ..
+sudo umount ~/Escritorio/Disco20GB
+sudo mount /dev/nvme0n2p1 /mnt
+cd /mnt
+ls
