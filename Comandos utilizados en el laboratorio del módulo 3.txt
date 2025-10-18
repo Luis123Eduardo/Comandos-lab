@@ -1,0 +1,116 @@
+==========Comandos utilizados en el 
+Laboratorio Módulo 3=====================
+
+==========Práctica 1=====================
+su -
+nano /etc/default/grub
+En el archivo, modificar la línea:
+GRUB_TIMEOUT=20
+
+Fuera del archivo:
+grub2-mkconfig -o /boot/grub2/grub.cfg
+reboot
+
+_________________________________________
+
+
+En el menú GRUB, presioné 'e' para editar
+Busqué la línea que comienza con "linux" y termina con "rhgb quiet"
+Al final de esa línea agregué: rd.break
+
+linux ($root)/vmlinuz-4.18.0-553.78.1.el8_10.x86_64 root=/dev/mapper/rhel-root rd.lvm.lv=rhel/root rd.lvm.lv=rhel/swap rhgb quiet rd.break
+
+Luego del Control + x:
+
+mount -o remount,rw /sysroot
+chroot /sysroot
+passwd
+touch /.autorelabel
+exit
+exit
+
+
+
+
+
+==========Práctica 2=====================
+
+nano backup_home.sh
+
+Dentro de backup_home.sh
+#!/bin/bash
+
+fecha=$(date +"%d-%m-%Y_%H-%M")
+tar -czf "backup_home_${fecha}.tar.gz" -C /home $USER
+echo "Backup creado exitosamente: backup_home_${fecha}.tar.gz"
+
+Fuera del archivo:
+chmod +x backup_home.sh
+./backup_home.sh
+ls -l
+________________________________________
+
+nano ifconfig_notas.sh
+
+Dentro de ifconfig_notas.sh
+#!/bin/bash
+echo -n "Ingresa el nombre del archivo: "
+read nombre
+ifconfig > ~/Escritorio/"${nombre}.txt"
+echo "Archivo ${nombre}.txt creado en el escritorio"
+
+Fuera del archivo:
+
+chmod +x ifconfig_notas.sh
+./ifconfig_notas.sh
+ls ~/Escritorio/
+cat ~/Escritorio/mi_red.txt
+
+
+
+
+
+==========Práctica 3=====================
+
+Comandos usados en Red hat:
+
+ip addr show
+
+sudo dnf install openssh-server
+which sshd
+sudo systemctl enable sshd
+sudo systemctl start sshd
+sudo firewall-cmd --permanent --add-service=ssh
+sudo firewall-cmd --reload
+
+sudo nano /etc/ssh/sshd_config  (Para buscar y descomentar: PubkeyAuthentication yes)
+sudo systemctl restart sshd
+
+Para Configurar permisos de llaves SSH (después de recibir la llave)
+mkdir -p ~/.ssh
+cat ~/id_rsa.pub >> ~/.ssh/authorized_keys
+chmod 700 ~/.ssh
+chmod 600 ~/.ssh/authorized_keys
+rm ~/id_rsa.pub
+
+
+Comandos usados en PowerShell:
+ping 192.168.1.52
+
+ssh 2025-0826@192.168.1.52 #(Escribí "yes" para fingerprint, ingresar contraseña)
+exit
+
+ssh-keygen -t rsa -b 4096
+(Puse la ubicación: C:\Users\Luis Mendez\.ssh\id_rsa)
+(Presioné Enter para passphrase vacío)
+
+cd 'C:\Users\Luis Mendez\.ssh'
+scp .\id_rsa.pub 2025-0826@192.168.1.52:~/
+
+ssh 2025-0826@192.168.1.52
+(Ejecuté los comandos de Linux mostrados arriba la de los permisos)
+
+Probar conexión automática final
+ssh 2025-0826@192.168.1.52
+
+
