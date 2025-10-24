@@ -1,0 +1,57 @@
+==============Laboratorio módulo 4:===================
+==============Práctica 1:===================
+
+sudo dnf install httpd -y
+sudo systemctl enable httpd
+sudo systemctl start httpd
+sudo systemctl status httpd
+sudo firewall-cmd --permanent --add-service=http
+sudo firewall-cmd --permanent --add-port=8080/tcp
+sudo firewall-cmd --reload
+sudo mkdir -p /var/www/hola-mundo
+sudo nano /var/www/hola-mundo/index.html
+sudo nano /etc/httpd/conf.d/hola-mundo.conf
+sudo mkdir -p /var/www/personal
+sudo nano /var/www/personal/index.html
+sudo nano /etc/httpd/conf.d/personal.conf
+sudo systemctl restart httpd
+sudo systemctl status httpd
+
+
+
+
+==============Práctica 2:===================
+
+sudo dnf install postfix mailx cyrus-sasl-plain -y
+sudo nano /etc/postfix/main.cf
+sudo systemctl reload postfix
+sudo systemctl enable postfix
+sudo systemctl start postfix
+sudo systemctl status postfix
+sudo systemctl reload postfix
+sudo nano /etc/postfix/sasl_passwd
+sudo chmod 600 /etc/postfix/sasl_passwd
+sudo postmap /etc/postfix/sasl_passwd
+ls -la /etc/postfix/sasl/passwd    (error)
+ls -la /etc/postfix/sasl_passwd*
+sudo firewall-cmd --permanent --add-service=smtp
+sudo firewall-cmd --reload
+sudo firewall-cmd --list-all
+echo "Hola, prueba 7 de la noche" | mail -s "Prueba 24 de octubre" luiseduardomendezjorge@gmail.com 
+sudo tail -f /var/log/maillog
+
+luego el video:
+echo "Nombre: Luis Eduardo Mendez Jorge 
+Matrícula: 2025-0826 
+Materia: Sistema Operativo III 
+Maestro: Adrian Alcantara" | mail -s "MambruSeFueALaGuerra" os3conadrian@gmail.com
+
+==============Práctica 3:===================
+
+sudo dnf install -y cups cups-pdf 
+sudo nano /etc/cups/cupsd.conf
+sudo systemctl restart cups
+sudo systemctl status cups
+sudo firewall-cmd --permanent --add-service=ipp
+sudo firewall-cmd --permanent --add-port=631/tcp
+sudo firewall-cmd --reload
