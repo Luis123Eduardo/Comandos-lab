@@ -40,7 +40,7 @@ sudo firewall-cmd --list-all
 echo "Hola, prueba 7 de la noche" | mail -s "Prueba 24 de octubre" luiseduardomendezjorge@gmail.com 
 sudo tail -f /var/log/maillog
 
-luego el video:
+luego del video:
 echo "Nombre: Luis Eduardo Mendez Jorge 
 Matrícula: 2025-0826 
 Materia: Sistema Operativo III 
@@ -55,3 +55,4 @@ sudo systemctl status cups
 sudo firewall-cmd --permanent --add-service=ipp
 sudo firewall-cmd --permanent --add-port=631/tcp
 sudo firewall-cmd --reload
+
