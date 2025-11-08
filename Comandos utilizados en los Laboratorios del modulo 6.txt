@@ -1,0 +1,264 @@
+
+=================Comandos del LAB 6============================
+
+=================PRÁCTICA 1============================
+
+Instalación y configuración de GPG2
+sudo dnf install gnupg2 -y
+
+
+Primero instalo la herramienta GPG2 para poder cifrar y descifrar archivos.
+Si ya está instalada, el sistema me lo indica automáticamente.
+
+Creación del entorno de trabajo y archivo a cifrar
+mkdir ~/gpg_prueba
+cd ~/gpg_prueba
+echo "Texto secreto" > archivo.txt
+cat archivo.txt
+
+
+Creo una carpeta para la práctica y dentro de ella un archivo con el mensaje que quiero proteger.
+Verifico que el contenido se haya guardado correctamente.
+
+Generación y verificación de la clave GPG
+gpg --gen-key
+
+
+Genero mi clave GPG y completo los datos: nombre, correo, tamaño de clave (4096 bits) y contraseña.
+Esa información forma mi identidad GPG, que incluye el nombre de usuario (el que puse al crear la clave).
+
+Por ejemplo:
+Nombre: Luis_Mendez
+Correo: luiseduardok720@gmail.com
+
+Ese nombre (“Luis_Mendez”) es el que usaré más adelante en el comando --recipient.
+
+gpg --list-keys
+Verifico que la clave aparezca correctamente en la lista.
+
+Cifrado del archivo
+gpg2 --encrypt --recipient "<NOMBRE_USUARIO>" archivo.txt
+
+Aquí reemplazo <NOMBRE_USUARIO> por el nombre que usé al generar la clave (por ejemplo, Luis_Mendez).
+Con esto se crea un archivo protegido llamado archivo.txt.gpg.
+
+Intento de acceso al archivo cifrado
+cat archivo.txt.gpg
+
+
+Intento leer el archivo cifrado y veo que solo aparecen caracteres extraños.
+Eso confirma que el contenido está encriptado y no se puede leer sin la clave privada.
+
+Descifrado y comprobación del contenido
+gpg2 --decrypt archivo.txt.gpg
+Descifro el archivo para recuperar el texto original.
+El sistema muestra “Texto secreto”, lo que indica que el cifrado y descifrado funcionaron correctamente.
+
+
+
+
+=================PRÁCTICA 2============================
+
+
+1. Habilitar servicios http, ftp, ssh:
+Instala e inicia servicios:
+- HTTP: sudo dnf install httpd y sudo systemctl start httpd && sudo systemctl enable httpd
+- FTP: sudo dnf install vsftpd y sudo systemctl start vsftpd && sudo systemctl enable vsftpd
+- SSH usualmente está instalado: sudo systemctl start sshd && sudo systemctl enable sshd
+- Verifica servicios: systemctl status httpd vsftpd sshd
+
+2. Bloquear puertos 80, 21, 22 con iptables:
+sudo iptables -A INPUT -p tcp --dport 80 -j DROP
+sudo iptables -A INPUT -p tcp --dport 21 -j DROP
+sudo iptables -A INPUT -p tcp --dport 22 -j DROP
+sudo iptables -L para ver reglas
+
+3. Permitir nuevamente esos puertos con iptables:
+sudo iptables -D INPUT -p tcp --dport 80 -j DROP
+sudo iptables -D INPUT -p tcp --dport 21 -j DROP
+sudo iptables -D INPUT -p tcp --dport 22 -j DROP
+
+4. Bloquear puertos con firewall-cmd (para Red Hat):
+sudo firewall-cmd --permanent --remove-service=http
+sudo firewall-cmd --permanent --remove-service=ftp
+sudo firewall-cmd --permanent --remove-service=ssh
+sudo firewall-cmd --reload
+
+5. Permitir puertos con firewall-cmd:
+sudo firewall-cmd --permanent --add-service=http
+sudo firewall-cmd --permanent --add-service=ftp
+sudo firewall-cmd --permanent --add-service=ssh
+sudo firewall-cmd --reload
+
+
+=================PRÁCTICA 3============================
+
+Actualizar sistema
+sudo dnf update -y && sudo dnf update -y
+
+Habilitar los repositorios necesarios (EPEL y CodeReady Builder)
+sudo dnf install https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm -y
+sudo subscription-manager repos --enable codeready-builder-for-rhel-8-$(arch)-rpms
+
+Configurar librerías
+sudo nano /etc/ld.so.conf.d/local.conf
+
+
+Agregar dentro del archivo:
+
+/usr/local/lib
+/usr/local/lib64
+
+
+Guardar, cerrar y actualizar el caché de librerías:
+
+sudo ldconfig
+
+Instalar dependencias
+sudo dnf install flex bison gcc gcc-c++ make cmake autoconf libtool git nano unzip wget \
+libpcap-devel pcre-devel hwloc-devel openssl-devel zlib-devel luajit-devel \
+pkgconfig pkgconf libunwind-devel libnfnetlink-devel libnetfilter_queue-devel \
+libmnl-devel xz-devel gperftools libuuid-devel hyperscan hyperscan-devel -y
+
+Instalar la dependencia libdnet desde GitHub
+cd ~
+git clone https://github.com/dugsong/libdnet.git
+cd libdnet
+./configure --without-check
+make
+sudo make install
+sudo ldconfig
+
+Instalar libdaq (Data Acquisition Library para Snort)
+git clone https://github.com/snort3/libdaq.git
+cd libdaq
+./bootstrap && ./configure && make && sudo make install
+sudo ldconfig && cd ..
+
+Instalar libpcre2 y su paquete de desarrollo
+sudo dnf install pcre2 pcre2-devel -y
+
+Instalar Snort 3
+git clone https://github.com/snort3/snort3.git
+cd snort3
+
+export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH
+export PKG_CONFIG_PATH=/usr/local/lib64/pkgconfig:$PKG_CONFIG_PATH
+export CFLAGS="-O3"
+export CXXFLAGS="-O3 -fno-rtti"
+
+./configure_cmake.sh --prefix=/usr/local/snort --enable-tcmalloc
+cd build/ && make -j$(nproc) && sudo make -j$(nproc) install
+cd ../.. && sudo ldconfig
+
+Crear enlace simbólico (acceso directo a Snort)
+sudo ln -s /usr/local/snort/bin/snort /usr/bin/snort
+
+Verificar la instalación
+snort -V
+
+9) Crear estructura de reglas locales
+
+sudo mkdir -p /usr/local/snort/etc/rules
+sudo nano /usr/local/snort/etc/rules/local.rules
+
+
+Poner dentro del archivo estas reglas:
+
+# Regla 1 - Detectar ICMP (ping)
+alert icmp any any -> $HOME_NET any (msg:"ICMP Ping detectado"; sid:1000001; rev:1;)
+
+# Regla 2 - Detectar tráfico hacia el puerto 21 (FTP)
+alert tcp any any -> $HOME_NET 21 (msg:"Intento de acceso FTP detectado"; sid:1000002; rev:1;)
+
+# Regla 3 - Detectar tráfico hacia el puerto 22 (SSH)
+alert tcp any any -> $HOME_NET 22 (msg:"Intento de acceso SSH detectado"; sid:1000003; rev:1;)
+
+# Regla 4 - Detectar tráfico hacia el puerto 80 (HTTP)
+alert tcp any any -> $HOME_NET 80 (msg:"Intento de acceso HTTP detectado"; sid:1000004; rev:1;)
+
+
+Guarda (Ctrl+O, Enter) y cierra (Ctrl+X).
+
+10) Validar configuración de Snort
+sudo snort -T \
+  -c /usr/local/snort/etc/snort/snort.lua \
+  -R /usr/local/snort/etc/rules/local.rules
+
+11) Ejecutar Snort como IDS (en ens160)
+
+sudo snort \
+  -c /usr/local/snort/etc/snort/snort.lua \
+  -R /usr/local/snort/etc/rules/local.rules \
+  -i ens160 -A alert_fast
+
+ens160 es el nombre de mi interfaz de red, en caso de no saber cual es el nombre de mi interfaz 
+utilizo el comando: ip a
+
+12) Pruebas desde la máquina host (cliente)
+<SNORT_SERVER_IP>: IP del servidor donde corre Snort.
+
+ICMP (Ping)
+ping <SNORT_SERVER_IP>
+
+FTP (21/TCP)
+Aun sin servidor FTP activo, Snort puede detectar el intento (SYN).
+ftp <SNORT_SERVER_IP>
+
+SSH (22/TCP)
+Si falla la autenticación es normal; a Snort le basta el tráfico.
+ssh <SNORT_SERVER_IP>
+
+HTTP (80/TCP)
+Opción rápida con Python (si no tienes Apache):
+sudo dnf install -y python3
+sudo python3 -m http.server 80
+Desde el host, abrir en el navegador:
+# http://<SNORT_SERVER_IP>
+
+
+Alternativa con Apache:
+
+sudo dnf install -y httpd
+sudo systemctl enable --now httpd
+
+
+Mientras pruebas, en la ventana de Snort verás alertas similares a:
+
+[**] [1:1000001:1] "ICMP Ping detectado" [**]
+[**] [1:1000002:1] "Intento de acceso FTP detectado" [**]
+[**] [1:1000003:1] "Intento de acceso SSH detectado" [**]
+[**] [1:1000004:1] "Intento de acceso HTTP detectado" [**]
+
+
+Debe indicar que la configuración se validó correctamente.
+
+13) (Opcional) Guardar evidencias en archivos de log
+Crear carpeta de logs y ejecutar Snort en modo alerta rápida:
+
+sudo mkdir -p /var/log/snort
+sudo snort \
+  -c /usr/local/snort/etc/snort/snort.lua \
+  -R /usr/local/snort/etc/rules/local.rules \
+  -i <INTERFAZ_DE_RED> -A alert_fast -l /var/log/snort
+
+
+Reemplazar <INTERFAZ_DE_RED> por tu interfaz (ej.: ens160, eth0, etc.).
+
+Ver las alertas:
+cat /var/log/snort/alert_fast.txt
+
+=================PRÁCTICA 4============================
+
+sudo dnf install google-authenticator qrencode-libs -y
+
+
+Iniciar sesión como el usuario que usará SSH y ejecutar:
+google-authenticator
+
+Seguir las instrucciones para generar el código QR, usar la app Google Authenticator en el teléfono, y configurar las opciones de seguridad y tokens.
+
+
+
+
+
