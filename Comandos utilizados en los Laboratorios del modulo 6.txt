@@ -37,6 +37,7 @@ gpg --list-keys
 Verifico que la clave aparezca correctamente en la lista.
 
 Cifrado del archivo
+cd ~/gpg_prueba
 gpg2 --encrypt --recipient "<NOMBRE_USUARIO>" archivo.txt
 
 Aquí reemplazo <NOMBRE_USUARIO> por el nombre que usé al generar la clave (por ejemplo, Luis_Mendez).
@@ -64,31 +65,77 @@ El sistema muestra “Texto secreto”, lo que indica que el cifrado y descifrad
 Instala e inicia servicios:
 - HTTP: sudo dnf install httpd y sudo systemctl start httpd && sudo systemctl enable httpd
 - FTP: sudo dnf install vsftpd y sudo systemctl start vsftpd && sudo systemctl enable vsftpd
+
+Otra manera de instalar:
+sudo dnf install httpd vsftpd -y
+sudo systemctl enable --now httpd vsftpd sshd
+
 - SSH usualmente está instalado: sudo systemctl start sshd && sudo systemctl enable sshd
 - Verifica servicios: systemctl status httpd vsftpd sshd
 
-2. Bloquear puertos 80, 21, 22 con iptables:
+2. Bloquear puertos con iptables
+
+reglas para bloquear el tráfico a los puertos 80, 21 y 22:
+
 sudo iptables -A INPUT -p tcp --dport 80 -j DROP
 sudo iptables -A INPUT -p tcp --dport 21 -j DROP
 sudo iptables -A INPUT -p tcp --dport 22 -j DROP
-sudo iptables -L para ver reglas
 
-3. Permitir nuevamente esos puertos con iptables:
+
+Verificar las reglas con:
+
+sudo iptables -L
+
+Comprobar que las reglas hayan sido aplicadas
+http://<IP-del-servidor>
+ftp <IP-del-servidor>
+ssh nombre_de_usuario@<IP-del-servidor>
+
+3. Permitir nuevamente con iptables
+
+Eliminar las reglas que bloqueaban el tráfico:
+
 sudo iptables -D INPUT -p tcp --dport 80 -j DROP
 sudo iptables -D INPUT -p tcp --dport 21 -j DROP
 sudo iptables -D INPUT -p tcp --dport 22 -j DROP
+Esto restaura el acceso.
 
-4. Bloquear puertos con firewall-cmd (para Red Hat):
+http://<IP-del-servidor>
+ftp <IP-del-servidor>
+ssh nombre_de_usuario@<IP-del-servidor>
+
+
+
+4. Bloquear servicios con firewall-cmd
+
+firewalld, que es lo correcto para Red Hat:
+
 sudo firewall-cmd --permanent --remove-service=http
 sudo firewall-cmd --permanent --remove-service=ftp
 sudo firewall-cmd --permanent --remove-service=ssh
 sudo firewall-cmd --reload
 
-5. Permitir puertos con firewall-cmd:
+Con esto bloqueo el tráfico hacia esos servicios.
+
+http://<IP-del-servidor>
+ftp <IP-del-servidor>
+ssh nombre_de_usuario@<IP-del-servidor>
+
+
+
+5. Volver a habilitar los servicios
+
+Finalmente, los volviste a permitir:
+
 sudo firewall-cmd --permanent --add-service=http
 sudo firewall-cmd --permanent --add-service=ftp
 sudo firewall-cmd --permanent --add-service=ssh
 sudo firewall-cmd --reload
+
+
+http://<IP-del-servidor>
+ftp <IP-del-servidor>
+ssh nombre_de_usuario@<IP-del-servidor>
 
 
 =================PRÁCTICA 3============================
@@ -250,15 +297,122 @@ cat /var/log/snort/alert_fast.txt
 
 =================PRÁCTICA 4============================
 
-sudo dnf install google-authenticator qrencode-libs -y
+PRÁCTICA 4: CONFIGURACIÓN DE AUTENTICACIÓN DE DOS FACTORES (2FA) CON GOOGLE AUTHENTICATOR
+
+PASO 1: INSTALACIÓN DE DEPENDENCIAS
+
+sudo dnf install -y epel-release
+sudo dnf install -y google-authenticator qrencode-libs chrony
+sudo systemctl enable --now chronyd
 
 
-Iniciar sesión como el usuario que usará SSH y ejecutar:
-google-authenticator
+PASO 2: CONFIGURACIÓN DE GOOGLE AUTHENTICATOR
+IMPORTANTE: Ejecutar como usuario normal, NO como root
 
-Seguir las instrucciones para generar el código QR, usar la app Google Authenticator en el teléfono, y configurar las opciones de seguridad y tokens.
+google-authenticator -t -d -f -r 3 -R 30 -W
+chmod 600 ~/.google_authenticator
+cp ~/.google_authenticator ~/.google_authenticator~readonly
+chmod 444 ~/.google_authenticator~readonly
 
 
+PASO 3: CONFIGURACIÓN DE CONTEXTO SELINUX
+
+sudo chcon -t user_home_t ~/.google_authenticator~readonly
+
+sudo cat > google_auth_complete.te << 'EOF'
+module google_auth_complete 1.0;
+require {
+    type sshd_t;
+    type user_home_t;
+    type auth_home_t;
+    class file { create write unlink read getattr setattr };
+    class dir { search write add_name remove_name };
+}
+allow sshd_t user_home_t:file { create write unlink read getattr setattr };
+allow sshd_t auth_home_t:file { create write unlink read getattr setattr };
+allow sshd_t user_home_t:dir { search write add_name remove_name };
+EOF
+
+sudo checkmodule -M -m -o google_auth_complete.mod google_auth_complete.te
+sudo semodule_package -o google_auth_complete.pp -m google_auth_complete.mod
+sudo semodule -i google_auth_complete.pp
 
 
+PASO 4: LIMPIEZA DE CONFIGURACIÓN SSH EXISTENTE
+sudo cp /etc/ssh/sshd_config /etc/ssh/sshd_config.backup
 
+sudo sed -i '/^ChallengeResponseAuthentication/d' /etc/ssh/sshd_config
+sudo sed -i '/^PasswordAuthentication/d' /etc/ssh/sshd_config
+sudo sed -i '/^PubkeyAuthentication/d' /etc/ssh/sshd_config
+sudo sed -i '/^KbdInteractiveAuthentication/d' /etc/ssh/sshd_config
+sudo sed -i '/^AuthenticationMethods/d' /etc/ssh/sshd_config
+sudo sed -i '/^LogLevel/d' /etc/ssh/sshd_config
+
+
+PASO 5: APLICACIÓN DE CONFIGURACIÓN SSH
+
+sudo tee -a /etc/ssh/sshd_config << 'EOF'
+UsePAM yes
+ChallengeResponseAuthentication yes
+KbdInteractiveAuthentication yes
+PasswordAuthentication no
+PubkeyAuthentication no
+AuthenticationMethods keyboard-interactive
+LogLevel VERBOSE
+EOF
+
+
+PASO 6: CONFIGURACIÓN DE PAM PARA SSH
+
+sudo cp /etc/pam.d/sshd /etc/pam.d/sshd.backup
+
+sudo tee /etc/pam.d/sshd << 'EOF'
+#%PAM-1.0
+auth       sufficient   pam_google_authenticator.so nullok secret=/home/USUARIO/.google_authenticator~readonly
+auth       required     pam_unix.so nullok try_first_pass
+account    required     pam_unix.so
+password   required     pam_unix.so
+session    required     pam_unix.so
+session    required     pam_selinux.so close
+session    required     pam_loginuid.so
+session    required     pam_selinux.so open env_params
+session    optional     pam_keyinit.so force revoke
+session    required     pam_namespace.so
+EOF
+
+
+PASO 7: VERIFICACIÓN DE CONFIGURACIONES
+sudo sshd -t
+sudo sshd -T | grep -i challengeresponse
+ls -lZ ~/.google_authenticator~readonly
+
+
+PASO 8: REINICIO DE SERVICIOS Y LIMPIEZA
+sudo systemctl restart sshd
+sudo faillock --user USUARIO --reset
+
+
+PASO 9: VERIFICACIÓN FINAL
+sudo sshd -T | grep -i -E "(challenge|keyboard|usepam|passwordauth|authent)"
+
+
+Salida esperada:
+- `challengeresponseauthentication yes`
+- `kbdinteractiveauthentication yes`
+- `passwordauthentication no`
+- `usepam yes`
+
+PASO 10: PRUEBA DE CONEXIÓN
+
+⦁	Desde cliente externo
+ssh -o PreferredAuthentications=keyboard-interactive USUARIO@IP_SERVIDOR
+
+⦁	Conexión alternativa
+ssh USUARIO@IP_SERVIDOR
+
+
+Notas importantes:
+- Reemplazar `USUARIO` con el nombre de usuario real
+- Reemplazar `IP_SERVIDOR` con la dirección IP del servidor
+- Mantener sesión administrativa abierta durante las pruebas
+- Verificar que el archivo ~/.google_authenticator~readonly tenga los permisos correctos
