@@ -302,8 +302,9 @@ ping os3.inet
 
 
 ---
- 
+(Por si tengo problemas para hacer conexion con la otra pc)
 
+## 11. Configuración de Windows
 
 ### En Windows - Configurar DNS
 
@@ -346,6 +347,7 @@ Otra Cuenta
 o Tambien asi:
 - Usuario: `lanegracubana`
 - Contraseña: `Luis2025-0826`
+
 
 
 
