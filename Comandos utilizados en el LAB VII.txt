@@ -1,0 +1,350 @@
+=====================Comandos Utilizados en el lab 7========================
+
+
+=====================Comandos Utilizados en la PRÁCTICA 1========================
+
+PRÁCTICA 1 – COMPARTIR ARCHIVOS ENTRE LINUX CON NFS
+Máquina SERVIDOR (192.168.1.150)
+
+sudo dnf install nfs-utils -y
+sudo mkdir /OS3
+sudo touch /OS3/Adrian{1..100}.txt
+sudo chmod -R 777 /OS3
+sudo nano /etc/exports          # agregas la línea:  /OS3 *(rw,sync,no_root_squash)
+sudo systemctl enable nfs-server
+sudo systemctl start nfs-server
+sudo exportfs -rav
+
+sudo firewall-cmd --add-service=nfs --add-service=rpc-bind --add-service=mountd --permanent
+sudo firewall-cmd --reload
+
+
+
+Máquina CLIENTE (cualquier otra Linux)
+sudo dnf install nfs-utils -y
+sudo mkdir /mnt/nfs_os3
+sudo mount 192.168.1.150:/OS3 /mnt/nfs_os3
+ls /mnt/nfs_os3                 # debes ver los 100 archivos
+sudo nano /etc/fstab            # agregas:  192.168.1.150:/OS3 /mnt/nfs_os3 nfs defaults 0 0
+sudo reboot
+ls /mnt/nfs_os3                 # tras el reinicio siguen los 100 archivos
+
+
+
+
+=====================Comandos Utilizados en la PRÁCTICA 2========================
+
+PRÁCTICA 2 – SERVIDOR SAMBA “PÚBLICO”
+100 archivos, 1 solo usuario: Luis_Eduardo
+(solo comandos que ya usaste, mismo orden, sin errores)
+
+sudo dnf install samba -y
+sudo mkdir -p /samba/public
+sudo touch /samba/public/adrian{1..100}.txt
+sudo chmod -R 777 /samba/public
+
+sudo useradd -M -s /sbin/nologin Luis_Eduardo
+
+sudo nano /etc/samba/smb.conf   # al final añades:
+
+[public]
+   comment = Public Share
+   path = /samba/public
+   browseable = yes
+   read only = no
+   writable = yes
+   valid users = Luis_Eduardo
+   guest ok = no
+
+
+
+
+sudo systemctl restart smb nmb
+sudo firewall-cmd --add-service=samba --permanent
+sudo firewall-cmd --reload
+sudo smbpasswd -a Luis_Eduardo
+sudo systemctl enable smb nmb
+sudo systemctl restart smb nmb
+sudo smbpasswd -e Luis_Eduardo
+sudo chown -R Luis_Eduardo:Luis_Eduardo /samba/public
+sudo chmod -R 755 /samba/public
+sudo setsebool -P samba_enable_home_dirs on
+sudo chcon -R -t samba_share_t /samba/public
+
+
+En Windows:
+Conectar unidad de red → \\192.168.1.150\public
+Usuario: Luis_Eduardo + contraseña elegida.
+
+Editas adrian99.txt, guardas el zumzum de la carabela, y en Linux:
+
+cat /samba/public/adrian99.txt
+verás la frase.
+
+
+=====================Comandos Utilizados en la PRÁCTICA 3========================
+
+# Práctica 3: Creación de Controlador de Dominio con Cliente Windows
+
+
+## 1. Preparación del Sistema
+### Configurar el hostname
+
+hostnamectl set-hostname dc1.inet
+
+
+### Configurar /etc/hosts
+
+nano /etc/hosts
+
+Agregar la siguiente línea (usar la IP real del servidor):
+
+192.168.1.150 dc1.inet dc1 os3.inet
+
+
+### Verificar el hostname
+
+hostname
+hostname -f
+
+### Actualizar el sistema e instalar paquetes necesarios
+
+Comandos que podria utilizar antes de empezar:
+dnf -y update
+dnf -y install epel-release
+sudo dnf config-manager --set-enabled powertools
+-------------------------------------------------
+sudo dnf makecache
+dnf -y install wget tar gcc make python3-devel
+
+
+## 2. Descarga e Instalación de Samba
+
+### Crear directorio y descargar Samba
+
+mkdir -p /samba && cd /samba
+wget https://download.samba.org/pub/samba/stable/samba-4.16.2.tar.gz
+tar -zxvf samba-4.16.2.tar.gz && cd samba-4.16.2/
+
+
+### Instalar dependencias de compilación
+
+sudo dnf -y install \
+    docbook-style-xsl python3-markdown bison dbus-devel flex gdb \
+    gnutls-devel jansson-devel keyutils-libs-devel krb5-workstation \
+    libacl-devel libaio-devel libarchive-devel libattr-devel libblkid-devel \
+    libtasn1 libtasn1-tools libxml2-devel libxslt lmdb-devel openldap-devel \
+    pam-devel perl perl-ExtUtils-MakeMaker perl-Parse-Yapp popt-devel \
+    python3-cryptography python3-dns python3-gpg readline-devel rpgen \
+    systemd-devel zlib-devel perl-JSON gpgme-devel screen
+
+
+### Compilar e instalar Samba
+
+./configure --prefix=/usr/local/samba --enable-fhs --with-ads --with-systemd
+make -j$(nproc)
+make install
+
+### Configurar el PATH
+
+export PATH=/usr/local/samba/bin:/usr/local/samba/sbin:$PATH
+
+
+### Configurar el PATH permanentemente
+
+nano ~/.bash_profile
+
+
+Agregar:
+
+PATH=$PATH:$HOME/bin:/usr/local/samba/bin:/usr/local/samba/sbin:$PATH
+export PATH
+
+
+---
+
+## 3. Provisión del Dominio Samba
+
+### Limpiar configuraciones anteriores (si existen)
+
+rm -f /usr/local/samba/etc/samba/smb.conf
+rm -rf /usr/local/samba/var/lib/samba/*
+rm -rf /usr/local/samba/var/run/samba/*
+rm -rf /usr/local/samba/var/cache/samba/*
+rm -rf /usr/local/samba/private/*
+
+
+### Provisionar el dominio
+
+samba-tool domain provision --use-rfc2307 --interactive --option="interfaces= lo ens160" --option="bind interfaces only = yes"
+
+
+**Parámetros a ingresar:**
+- Realm: `OS3.INET`
+- Domain: `OS3`
+- Server Role: `dc`
+- DNS backend: `SAMBA_INTERNAL`
+- DNS forwarder: `8.8.8.8`
+- Administrator password: (contraseña compleja, ej: `Admin123!`)
+
+---
+
+## 4. Configuración Post-Provisión
+
+### Copiar archivo de Kerberos
+
+cp /usr/local/samba/var/lib/samba/private/krb5.conf /etc/krb5.conf
+
+
+### Detener instancias anteriores de Samba (si existen)
+
+pkill -9 samba
+pkill -9 smbd
+pkill -9 winbindd
+
+
+### Iniciar Samba
+
+samba
+
+
+### Verificar que Samba está corriendo
+
+ps aux | grep samba
+
+
+### Verificar que el DNS está escuchando
+
+ss -tulnp | grep :53
+
+
+---
+
+## 5. Configuración del Firewall
+
+### Iniciar y habilitar firewalld
+
+systemctl start firewalld
+systemctl enable firewalld
+
+
+### Agregar reglas de firewall
+
+firewall-cmd --permanent --add-service={ldap,ldaps,kerberos,dns}
+firewall-cmd --permanent --add-port={53,88,135,139,389,445,464,636,3268,3269}/tcp
+firewall-cmd --permanent --add-port={53,88,123,138,389,464}/udp
+firewall-cmd --permanent --add-port=49152-65535/tcp
+firewall-cmd --reload
+
+
+---
+
+## 6. Configuración de Red
+
+### Identificar el nombre de la conexión
+
+nmcli con show
+
+
+### Configurar DNS local (reemplazar "conexion_wifi" con el nombre de tu conexión)
+
+sudo nmcli con mod "conexion_wifi" ipv4.dns 192.168.1.150
+sudo nmcli con mod "conexion_wifi" ipv4.ignore-auto-dns yes
+sudo nmcli con up "conexion_wifi"
+```
+
+---
+
+## 7. Configuración de SELinux
+
+
+sudo setenforce 0
+sestatus
+
+
+---
+
+## 8. Resetear Contraseña del Administrator (si es necesario)
+
+
+/usr/local/samba/bin/samba-tool user setpassword Administrator
+
+
+---
+
+## 9. Pruebas de DNS
+
+### Verificar resolución de nombres
+
+host -t A dc1.os3.inet 192.168.1.150
+host -t SRV _ldap._tcp.os3.inet 192.168.1.150
+nslookup dc1.os3.inet 192.168.1.150
+
+
+### Pruebas de ping
+
+ping google.com
+ping dc1.inet
+ping os3.inet
+
+
+---
+
+## 10. Crear Usuario lanegracubana
+
+
+/usr/local/samba/bin/samba-tool user create lanegracubana "Luis2025-0826" --given-name="La Negra" --surname="Cubana" --mail=lanegracubana@os3.inet
+
+
+### Verificar que el usuario se creó
+
+/usr/local/samba/bin/samba-tool user list
+
+
+---
+
+## 11. Configuración de Windows
+
+### En Windows - Configurar DNS
+
+1. Presionar `Win + R`, escribir `ncpa.cpl` y presionar Enter
+2. Clic derecho en el adaptador de red → Propiedades
+3. Seleccionar "Protocolo de Internet versión 4 (TCP/IPv4)" → Propiedades
+4. Seleccionar "Usar las siguientes direcciones de servidor DNS"
+5. Servidor DNS preferido: `192.168.1.150`
+6. Aceptar
+
+### Limpiar caché DNS
+
+ipconfig /flushdns
+
+
+### Probar conectividad
+
+ping 192.168.1.150
+ping dc1.os3.inet
+ping os3.inet
+
+
+### Unir al dominio
+
+1. Presionar `Win + R`, escribir `sysdm.cpl` y presionar Enter
+2. Pestaña "Nombre de equipo" → Cambiar
+3. Seleccionar "Miembro de: Dominio"
+4. Escribir: `os3.inet`
+5. Aceptar
+6. Ingresar credenciales:
+   - Usuario: `Administrator`
+   - Contraseña: (la del Administrator de Samba)
+7. Reiniciar Windows
+
+### Iniciar sesión con el usuario creado
+
+Después de reiniciar:
+Otra Cuenta
+- Usuario: `OS3\lanegracubana`
+o Tambien asi:
+- Usuario: `lanegracubana`
+- Contraseña: `Luis2025-0826`
+
+
