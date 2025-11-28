@@ -25,6 +25,7 @@ sudo systemctl status docker
 
 sudo docker run hello-world
 docker --version
+
 # Buscar la imagen de Nginx y descargarla:
 sudo docker search nginx
 sudo docker pull nginx
@@ -192,4 +193,5 @@ sudo docker ps
 
 # Desde el navegador:
 http://localhost:8885
+
 
