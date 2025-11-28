@@ -1,0 +1,195 @@
+Laboratorio del Módulo VIII
+==========Practica 1: Instalación y configuración de Docker========================
+
+# Remover versiones antiguas de Docker
+sudo dnf remove -y docker \
+                docker-client \
+                docker-client-latest \
+                docker-common \
+                docker-latest \
+                docker-latest-logrotate \
+                docker-logrotate \
+                docker-engine \
+                podman \
+                runc
+
+# Instalar utilizando repositorio RPM
+sudo dnf -y install dnf-plugins-core
+sudo dnf config-manager --add-repo https://download.docker.com/linux/rhel/docker-ce.repo
+
+sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+sudo systemctl enable docker
+sudo systemctl start docker
+sudo systemctl status docker
+
+sudo docker run hello-world
+docker --version
+# Buscar la imagen de Nginx y descargarla:
+sudo docker search nginx
+sudo docker pull nginx
+sudo docker images
+
+# Crear directorio y archivo HTML
+sudo mkdir /home/website
+cd /home/website/
+sudo nano index.html
+
+Contenido del index.html:
+
+<html>
+<head>
+    <title>DOCKER x NGINX</title>
+</head>
+<body>
+    <h1>Luis Eduardo Mendez Jorge</h1>
+    <h2>Matricula: 2025-0826</h2>
+</body>
+</html>
+
+# Ejecutar contenedor Nginx
+sudo docker run -d --name nginx-luis \
+-p 8888:80 \
+-v /home/website:/usr/share/nginx/html \
+nginx
+
+sudo docker ps -a
+o
+sudo docker ps
+
+# En el navegador de nuestra máquina:
+http://127.0.0.1:8888 
+
+
+=================================Practica 2: Instalación de Portainer=================================
+Página web sobre Instalación de Portainer. https://docs.portainer.io/start/install-ce/server/docker/linux
+
+# Instalar Portainer
+sudo docker volume create portainer_data
+sudo docker run -d -p 9443:9443 --name portainer --restart=always -v /var/run/docker.sock:/var/run/docker.sock -v portainer_data:/data portainer/portainer-ce:lts
+
+1. Crear volumen para datos de Portainer
+sudo docker volume create portainer_data
+
+2. Crear contenedor de Portainer
+sudo docker run -d -p 9443:9443 --name portainer --restart=always -v /var/run/docker.sock:/var/run/docker.sock -v portainer_data:/data portainer/portainer-ce:lts
+
+3. Verificar contenedor corriendo
+sudo docker ps -a
+
+4. Acceder en navegador
+https://127.0.0.1:9443
+
+5. Aceptar certificado autofirmado
+Clic "Avanzado" → "Aceptar el riesgo y continuar"
+
+6. Crear usuario administrador
+Username: admin
+Password: (mínimo 12 caracteres)
+Clic "Create user"
+
+7. En Environment Wizard
+Clic en "Get Started" (usar ambiente local)
+
+clic en "local" → contenedores → selecciono el contenedor Nginx y le doy click al botón de "stop"
+_________________________________________________
+Si "local" me da error, o se coloca en down hacer lo siguiente:
+
+8. Agregar ambiente remoto con Agent
+Ir a: Environment-related → Environments → "+ Add environment"
+Seleccionar: Docker Standalone
+Seleccionar: Agent
+
+9. Ejecutar comando del Agent en terminal
+Esto aparecerá en Portainer
+
+sudo docker run -d \
+-p 9001:9001 \
+--name portainer_agent \
+--restart=always \
+-v /var/run/docker.sock:/var/run/docker.sock \
+-v /var/lib/docker/volumes:/var/lib/docker/volumes \
+-v /:/host \
+portainer/agent:2.33.4
+
+10. Configurar conexión del Agent en Portainer
+
+Name: Luis
+Environment address: 192.168.1.150:9001 (IP DEL SERVIDOR:9001)
+Clic "Connect"
+(Aparece mensaje: "Environment created - Luis")
+
+11. Verificar ambientes conectados
+Ir a Home → Se ven 2 ambientes: "local" y "Luis" (Connected)
+
+12. Ver Dashboard del ambiente Luis
+Clic en "Luis" → Dashboard muestra: Containers, Images, Networks, Volumes
+
+13. Detener contenedor Nginx desde Portainer
+Ir a Containers → Seleccionar "nginx-luis" → Clic "Stop"
+
+14. Verificar que Nginx no responde
+http://127.0.0.1:8888 (debe dar error)
+
+
+
+=======Practica #3: IDespliegue de contenedor de Wordpress utilizando Docker-Compose=================
+
+# Instalar Docker Compose:
+sudo curl -L "https://github.com/docker/compose/releases/download/v2.27.0/docker-compose-linux-x86_64" -o /usr/local/bin/docker-compose
+sudo chmod +x /usr/local/bin/docker-compose
+echo 'export PATH=$PATH:/usr/local/bin' >> ~/.bashrc
+source ~/.bashrc
+sudo dnf install -y docker-ce docker-ce-cli containerd.io
+sudo systemctl enable --now docker
+docker-compose version
+
+# Crear directorio para el proyecto:
+mkdir ~/wordpress-compose
+cd ~/wordpress-compose
+sudo nano docker-compose.yml
+
+Contenido del archivo docker-compose.yml:
+
+services:
+  db:
+    image: mysql:5.7
+    container_name: wordpress_db
+    restart: always
+    environment:
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: wp_user
+      MYSQL_PASSWORD: wp_pass
+      MYSQL_ROOT_PASSWORD: root_pass
+    volumes:
+      - db_data:/var/lib/mysql
+
+  wordpress:
+    image: wordpress:latest
+    container_name: wordpress_app
+    restart: always
+    ports:
+      - "8885:80"
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_NAME: wordpress
+      WORDPRESS_DB_USER: wp_user
+      WORDPRESS_DB_PASSWORD: wp_pass
+    depends_on:
+      - db
+    volumes:
+      - wp_data:/var/www/html
+
+volumes:
+  db_data:
+  wp_data:
+
+
+# Luego de guardar y salir, desplegamos los contenedores:
+
+sudo docker compose up -d
+sudo docker ps
+
+# Desde el navegador:
+http://localhost:8885
+
