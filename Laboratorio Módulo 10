@@ -1,0 +1,179 @@
+Práctica Módulo 10
+Nota: No conectarme via ssh desde VMware.
+
+Primero necesitas generar una llave SSH en esta máquina:
+
+ssh-keygen -t rsa -b 4096
+
+"Enter" a todo y en caso que pida sobrescribir poner "no"
+
+Mostrar la llave generada:
+cat ~/.ssh/id_rsa.pub
+
+
+## PASO 2: Configurar Firewall en DigitalOcean
+
+**ANTES de conectarte**, ve a **Networking → Firewalls → Create Firewall**
+
+### Inbound Rules:
+
+| Type   | Protocol | Port        | Sources  |
+| ------ | -------- | ----------- | -------- |
+| SSH    | TCP      | 22          | All IPv4 |
+| HTTP   | TCP      | 80          | All IPv4 |
+| HTTPS  | TCP      | 443         | All IPv4 |
+| Custom | TCP      | 5060        | All IPv4 |
+| Custom | TCP      | 5066        | All IPv4 |
+| Custom | UDP      | 5060        | All IPv4 |
+| Custom | UDP      | 5066        | All IPv4 |
+| Custom | UDP      | 10000-20000 | All IPv4 |
+
+---
+
+## PASO 3: Conectar por SSH e Instalar Issabel
+
+### Desde tu máquina local (Red Hat/Linux):
+
+
+ssh -i ~/.ssh/id_rsa root@TU_IP_DEL_DROPLET
+
+
+### Ya dentro del servidor:
+
+
+yum install -y wget
+wget http://repo.issabel.org/issabel5-netinstall.sh
+chmod +x issabel5-netinstall.sh
+./issabel5-netinstall.sh
+```
+
+---
+
+## PASO 4: Proceso de Instalación (Menú Interactivo)
+
+Durante la instalación te pedirá:
+
+| Opción              | Qué elegir                                   |
+| ------------------- | -------------------------------------------- |
+| Language            | English (o Spanish)                          |
+| Asterisk version    | 16                                           |
+| Additional packages | Dejar los primeros 2 marcados, Sangoma NO    |
+| SIP channel driver  | chan_sip                                     |
+| MariaDB password    | Tu contraseña                  
+| Admin password      | Tu contraseña 
+
+---
+
+## PASO 5: Deshabilitar fail2ban
+
+Después de que termine la instalación, conecta por SSH:
+
+```
+ssh -i ~/.ssh/id_rsa root@TU_IP_DEL_DROPLET
+```
+
+Ejecuta:
+
+```
+systemctl stop fail2ban
+systemctl disable fail2ban
+iptables -F
+```
+
+---
+
+## PASO 6: Acceder al Portal Web
+
+1. Abre el navegador: `https://TU_IP_DEL_DROPLET`
+2. Acepta el certificado (Advanced → Continue)
+3. Login: `admin` / tu contraseña
+
+---
+
+## PASO 7: Crear las Extensiones
+
+### Navega a: **Applications → Extensions**
+
+O accede directamente:
+`https://TU_IP/admin/config.php?display=extensions`
+
+### Crear Extensión 2220 (Profesor):
+
+1. Device: **Generic SIP Device** → Submit
+2. Configura:
+
+   * User Extension: `2220`
+   * Display Name: `Profesor`
+   * Secret: `Teletubies123$`
+   * nat: `Yes`
+3. Submit
+
+### Crear Extensión 2221 (Estudiante):
+
+1. Device: **Generic SIP Device** → Submit
+2. Configura:
+
+   * User Extension: `2221`
+   * Display Name: `Estudiante`
+   * Secret: Tu contraseña 
+   * nat: `Yes`
+3. Submit
+
+### Aplicar cambios:
+
+Haz clic en el botón rojo **"Apply Config"**.
+
+---
+
+## PASO 8: Configurar Zoiper
+
+### En PC (extensión 2220 - Profesor):
+
+| Campo     | Valor            |
+| --------- | ---------------- |
+| Username  | `2220`           |
+| Password  | `Teletubies123$` |
+| Hostname  | `TU_IP:5066`     |
+| Transport | UDP              |
+
+### En Móvil (extensión 2221 - Estudiante):
+
+| Campo       | Valor                     |
+| ----------- | ------------------------- |
+| Username    | `2221`                    |
+| Password    | Tu secret                 |
+| Host/Server | `TU_IP`                   |
+| Port        | `5066`                    |
+| Transport   | UDP                       |
+| STUN        | `stun.l.google.com:19302` |
+
+---
+
+## PASO 9: Verificar que funciona
+
+### Desde SSH:
+
+
+asterisk -rx "sip show peers"
+
+
+Deberías ver ambas extensiones con **Status: OK**
+
+### Prueba de llamada:
+
+* Desde el móvil (2221), marca **2220**
+* La PC debería sonar
+
+---
+
+## 📄 Datos para el PDF del Entregable:
+
+| Campo                | Valor                   |
+| -------------------- | ----------------------- |
+| IP de la PBX         | `IP_DEL_DROPLETS`       |
+| Usuario Admin        | `admin`                 |
+| Contraseña Admin     | (la que configuraste)   |
+| Extensión Estudiante | `2221`                  |
+| Extensión Profesor   | `2220`                  |
+| Secret Profesor      | `Teletubies123$`        |
+
