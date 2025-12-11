@@ -51,3 +51,214 @@ sudo umount ~/Escritorio/Disco20GB
 sudo mount /dev/nvme0n2p1 /mnt
 cd /mnt
 ls
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+====================================Práctica 1========================================
+
+
+*/ Actualizar los paquetes y directorios, y descargar nuevas versiones:
+
+sudo dnf update && upgrade
+
+*/ Ver la lista de repositorios existentes:
+
+dnf repolist
+
+*/ Buscar una herramienta dentro de los repositorios y paquetes del sistema (Bashtop):
+
+dnf search bashtop
+
+*/ Instalar las herramientas EPEL (Extra Packages for Enterprise Linux)
+
+sudo dnf install https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm -y
+
+*/ Instalar la herramienta Bashtop, si se encuentra en los paquetes EPEL;
+
+make uninstall
+
+*/ Si Bashtop no se encuentra, clonamos los repositorios de Git:
+
+sudo git clone https://github.com/aristocratos/bashtop.git
+
+*/ Nos posicionamos en el archivo clonado:
+
+cd bashtop 
+
+*/ Descargamos la herramienta:
+
+sudo make install
+
+*/ Si no tenemos la herramienta correspondiente para el comando "make install", la descargamos:
+
+sudo dnf groupinstall "Development Tools" -y
+
+*/ Luego de instalar, ejecutamos Bashtop:
+
+bashtop
+
+*/ Eliminamos la herramienta utilizando el administrador de paquetes (en caso de haberla instalado con el mismo):
+
+make uninstall
+
+*/ Removemos archivos de configuración de la herramienta:
+
+rm -rf ~/.config/bashtop
+
+*/ Eliminando archivos residuales:
+
+sudo dnf autoremove -y
+
+*/ Eliminamos el binario principal de Bashtop si lo descargamos manualmente:
+
+sudo rm -f /usr/local/bin/bashtop
+
+*/ Buscamos más restos de la herramienta:
+
+sudo find /usr/local -iname 'bashtop'
+
+*/ Eliminamos los archivos residuales encontrados:
+
+sudo rm -rf /usr/local/share/doc/bashtop
+
+
+
+====================================Práctica 2========================================
+
+
+#  Abrimos el archivo crontab para plasmar nuestra primera tarea:
+
+sudo crontab -e
+
+# Línea de configuración de la tarea (actualizar el sistema todos los días a las 11 pm)
+
+0 23 * * * dnf update -y
+
+# Línea de configuración de la segunda tarea (reiniciar el sistema todos los domingos a las 3 am)
+
+0 3 * * 0 /sbin/shutdown -f now
+
+# Presionamos esc y escribimos el comando para guardar y salir:
+
+:wq
+
+# Comandos para habilitar la herramienta AT:
+
+sudo systemctl start atd
+sudo systemctl enable atd
+
+# Ver el contenido de los archivos temporales:
+
+ls /tmp
+
+# Crear un trabajo con la herramienta AT (eliminar contenido de los archivos temporales en 1 minuto)
+
+echo "rm -rf /tmp/* | at now + 1 minute
+
+# (EXTRA) Configurar un trabajo con la herramienta AT para crear un archivo de texto en la carpeta de archivos temporales:
+
+echo "touch /tmp/PRUEBA.txt" | at now + 1 minute
+
+# Luego de un minuto, comprobamos que la carpeta esté limpia:
+
+ls /tmp
+
+====================================Práctica 3========================================
+
+#Listamos los discos y particiones existentes en la máquina:
+
+lsblk
+
+#Luego de agregar el nuevo disco desde las configuraciones de la máquina, utilizamos el comando fdisk para crear una partición en el disco:
+
+sudo fdisk /dev/nvme0n2
+
+#Dentro de la herramienta fdisk, seguimos las siguientes configuraciones:
+
+n       # nueva partición
+p       # tipo primaria
+[Enter] # aceptar número de partición por defecto
+[Enter] # aceptar sector inicial por defecto
+[Enter] # aceptar sector final por defecto
+w       # guardar y salir
+
+#Listamos nuevamente los discos para verificar la partición creada:
+
+lsblk 
+
+#Formateamos la partición como ext4:
+
+sudo mkfs.ext4 /dev/nvme0n2p1
+
+#Creamos una carpeta en el escritorio y montamos el disco:
+
+cd ~/Desktop
+
+mkdir MiDisco
+
+sudo mount /dev/nvme0n2p1 ~/Desktop/MiDisco
+
+#Creamos el archivo de texto "AdrianAlcantara" dentro de la carpeta que contiene el disco:
+
+cd MiDisco
+
+sudo touch AdrianAlcantara.txt
+
+#Salimos de la ubicación y desmontamos el disco:
+
+cd ~
+sudo umount ~/Desktop/MiDisco
+
+#Ahora montamos el disco en otra localización, la /mnt
+
+sudo mount /dev/nvme0n2p1 /mnt
+
+#Verificamos que el archivo de texto AdrianAlcantara.txt siga ahí:
+
+ls /mnt
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
