@@ -114,3 +114,248 @@ Probar conexión automática final
 ssh 2025-0826@192.168.1.52
 
 
+
+
+
+
+
+
+
+
+
+
+====================================Práctica 1========================================
+
+Menú GRUB2, recuperación de CONTRASEÑA ROOT
+
+============================================
+
+#Ingresar al archivo de configuración del menú Grub2:
+
+sudo nano /etc/default/grub
+
+#Al ver la línea de configuración "GRUB_TIMEOUT=5", cambiamos el número 5 (segundos) por el que queramos configurar (20). Ctrl + O para guardar, Ctrl + X para salir. Luego, actualizamos la configuración de Grub:
+
+sudo grub2-mkconfig -o /boot/grub2/grub.cfg
+
+#Luego, para ingresar al menú Grub y recuperar la contraseña Root, reiniciamos la máquina. Tan pronto como veamos el menú, presionamos la letra "e" en el teclado.
+
+#Al ingresar al menú, ubicamos el cursor en la línea qué inicia con la palabra "linux /vmlinuz-...". Para ir hasta el final de dicha línea, presionamos "Ctrl + e", y agregamos "rd.break". Luego, presionamos Ctrl + X para ejecutar el menú con las nuevas configuraciones. 
+
+#Tendremos acceso como Root en modo emergencia. Con los siguientes comandos remontamos el sistema de archivos con permisos de escritura:
+
+mount -o remount,rw /sysroot
+
+chroot /sysroot
+
+#Cambiamos la contraseña:
+
+passwd
+
+#Luego de ello, escribimos y reescribimos la nueva contraseña de Root. Después, opcional pero recomendado, actualizamos el contexto SELinux.
+
+touch /.autorelabel
+
+#Salimos del entorno. El sistema se reiniciará automáticamente:
+
+exit
+
+exit
+
+#Una vez iniciado el sistema, abrimos la terminal y ejecutamos el comando:
+
+su
+
+#Colocaremos la nueva contraseña de Root, y veremos cómo obtenemos privilegios de super usuario.
+
+====================================Práctica 2========================================
+
+ Comandos utilizados, práctica laboratorio 3.2: Tareas Avanzadas y Administración de Servicios de Red.
+
+SHELL SCRIPTING en RHEL
+
+============================================
+
+#Para crear el primer shell code: hacer un backup de los archivos /home/usuario y guardar dicho backup con la hora y fecha exactas en el nombre.
+
+nano backup.sh
+
+#Dentro del archivo, colocamos el script (un backup de /home/usuario con fecha y hora en el nombre):
+
+#!/bin/bash
+FECHA=$(date +"%d-%m-%Y:%H:%M")
+tar -cvzf /home/$(whoami)/backup_home_$FECHA.tar.gz /home/$(whoami)
+
+#Guardamos y cerramos el editor (Ctrl + O, Ctrl + X). Luego, damos permisos de ejecución:
+
+chmod +x backup.sh
+
+#Ejecutamos el script:
+
+./backup.sh
+
+#Para comprobar la efectividad de la ejecución, listamos los archivos existentes dentro de la carpeta usuario:
+
+cd /home/usuario 
+ls -l
+
+#Para crear el segundo shell code: crear un archivo txt con el resultado del comando ifconfig, que se guarde en el escritorio y que nos pregunte qué nombre deseamos poner al archivo.
+
+sudo nano ifconfig.sh
+
+#Dentro del documento, colocamos el bash:
+
+#!/bin/bash
+read -p "Ingrese el nombre del archivo: " nombre
+ifconfig > /home/$(whoami)/Desktop/"$nombre".txt
+echo "El archivo se ha guardado en el escritorio con el nombre $nombre.txt"
+
+#Salimos del documento y agregamos permisos de ejecución:
+
+sudo chmod +× ifconfig.sh
+
+#Ejecutar el script:
+
+./ifconfig.sh
+
+#Nos preguntará en nombre que queremos asignar al archivo de texto. Por ejemplo, Pruebaif.txt. Para verificar que el archivo existe y contiene el contenido correcto, hacemos lo siguiente:
+
+cd /home/ferna/Desktop
+ls -l
+cat Pruebaifconfig.txt
+
+====================================Práctica 3========================================
+
+# En la máquina Linux (RHEL / Rocky) instalamos el servidor SSH:
+
+sudo dnf install openssh-server
+# Ejemplo (se queda igual, no lleva datos reales):
+# sudo dnf install openssh-server
+
+# Activamos el servicio
+
+sudo systemctl start sshd
+sudo systemctl enable sshd
+# Ejemplo:
+# sudo systemctl start sshd
+# sudo systemctl enable sshd
+
+# Verificar el estatus del servicio:
+
+sudo systemctl status sshd
+# Ejemplo:
+# sudo systemctl status sshd
+
+
+# Conexión desde Windows hacia la máquina Linux por SSH
+# Desde la terminal de Windows (CMD o PowerShell) usamos:
+#   ssh USUARIO_LINUX@IP_SERVIDOR_LINUX
+
+ssh USUARIO_LINUX@IP_SERVIDOR_LINUX
+# USUARIO_LINUX      -> usuario de la máquina Linux
+# IP_SERVIDOR_LINUX  -> IP de la máquina Linux
+#   En Linux puedes verla con:  ip a   o   nmcli con show
+#   En Windows puedes ver tu IP con:   ipconfig
+
+# Ejemplo:
+# Usuario en Linux:   admin
+# IP del servidor:    192.168.10.50
+# Comando real:
+# ssh admin@192.168.10.50
+
+
+# Ya dentro de la sesión SSH podemos movernos por rutas remotas, por ejemplo:
+
+cd /home/USUARIO_LINUX/Desktop
+ls -l
+
+# Ejemplo:
+# cd /home/admin/Desktop
+# ls -l
+
+
+# Para cerrar la conexión SSH:
+
+exit
+# Ejemplo:
+# exit
+
+
+# GENERAR PAR DE LLAVES SSH DESDE WINDOWS
+# En Windows (CMD o PowerShell):
+
+ssh-keygen
+# Esto genera por defecto algo como:
+#   Llave privada:  C:\Users\USUARIO_WINDOWS\.ssh\id_rsa
+#   Llave pública:  C:\Users\USUARIO_WINDOWS\.ssh\id_rsa.pub
+
+# Ejemplo:
+# Usuario de Windows:  LuisPC
+# Rutas generadas:
+#   C:\Users\LuisPC\.ssh\id_rsa
+#   C:\Users\LuisPC\.ssh\id_rsa.pub
+
+
+# Abrir la llave pública en Bloc de notas para copiar su contenido:
+
+notepad C:\Users\USUARIO_WINDOWS\.ssh\NOMBRE_DE_LA_LLAVE.pub
+# USUARIO_WINDOWS     -> usuario con el que inicias sesión en Windows
+# NOMBRE_DE_LA_LLAVE  -> nombre del archivo de llave pública (id_rsa.pub, id_ed25519.pub, etc.)
+
+# Ejemplo:
+# notepad C:\Users\LuisPC\.ssh\id_rsa.pub
+
+
+# PEGAR LA LLAVE PÚBLICA EN LA MÁQUINA LINUX (RHEL / Rocky)
+
+# En la máquina Linux, como el usuario al que te vas a conectar por SSH:
+
+cd
+mkdir .ssh        # si ya existe, no pasa nada
+cd .ssh
+sudo nano authorized_keys   # o nano authorized_keys si estás usando tu usuario normal
+
+# Dentro de 'authorized_keys' PEGA TODO el contenido de la llave pública (.pub) copiada desde Windows
+# Guarda y sal del editor.
+
+
+# Volvemos a Windows y probamos la conexión SIN contraseña:
+
+ssh USUARIO_LINUX@IP_SERVIDOR_LINUX
+
+# Ejemplo:
+# ssh admin@192.168.10.50
+
+# Si la llave fue copiada correctamente a authorized_keys,
+# la conexión deberá iniciarse sin pedir contraseña.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
