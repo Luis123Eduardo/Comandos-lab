@@ -1,0 +1,615 @@
+==========================Práctica 1=======================================
+
+# En el Servidor Primario (Server1):
+# Crea la carpeta y 100 archivos:
+mkdir /home/syncdir
+cd /home/syncdir
+touch file{001..100}.txt
+
+# Prueba conexión SSH al servidor secundario y salimos
+ssh usuario@IP_DEL_SERVER2
+
+# Creamos un ssh-key para acceder sin contraseña
+ssh-keygen -t rsa -b 4096
+# Le das enter tres veces
+# Y lo copiamos en el otro servidor
+ssh-copy-id usuario@IP_DEL_SERVER2
+
+# Ejecuta rsync manualmente (prueba):
+rsync -avz /home/syncdir/ usuario@IP_DEL_SERVER2:/home/syncdir/
+
+# Crear script automático:
+# Crea un archivo llamado /usr/local/bin/syncjob.sh:
+sudo nano /usr/local/bin/syncjob.sh
+# Dentro coloca:
+
+#!/bin/bash
+rsync -avz /home/syncdir/ usuario@IP_DEL_SERVER2:/home/syncdir/
+
+# Dale permisos:
+sudo chmod +x /usr/local/bin/syncjob.sh
+
+# Crear tarea en crontab:
+# Abre el cron:
+crontab -e
+# Agrega la línea:
+
+* * * * * /usr/local/bin/syncjob.sh
+
+# Esto ejecutará el script cada 1 minuto.
+
+# Validación:
+# Crea un nuevo archivo en el servidor 1:
+
+touch /home/syncdir/nuevo.txt
+
+# Espera 1 o 2 minutos.
+# En el Servidor 2, verifica:
+
+ls /home/syncdir/
+
+Debes ver nuevo.txt allí.
+Eso confirma que el cron + rsync funcionan correctamente.
+
+
+====================================Práctica 2=======================================
+INSTALACION Y CONFIGURACION DEL CLUSTER (LIMPIADO Y ESTANDARIZADO)
+
+
+1) Habilitar repositorios de alta disponibilidad en ambos servidores
+
+Comando:
+sudo subscription-manager repos --enable=rhel-8-for-x86_64-highavailability-rpms
+
+Este comando se usa igual en los dos nodos, no tiene datos personalizados.
+
+Comando util para ver repositorios disponibles:
+sudo subscription-manager repos --list
+
+Ejemplo:
+sudo subscription-manager repos --enable=rhel-8-for-x86_64-highavailability-rpms
+
+
+
+2) Instalar Pacemaker y PCS en ambos servidores
+
+Comando:
+sudo dnf install -y pacemaker pcs
+
+Se ejecuta tal cual en cada servidor.
+
+Para verificar que estan instalados:
+rpm -qa | grep -E "pacemaker|pcs"
+
+Ejemplo:
+sudo dnf install -y pacemaker pcs
+
+
+
+3) Habilitar e iniciar el servicio pcsd en ambos servidores
+
+Comandos:
+sudo systemctl enable pcsd
+sudo systemctl start pcsd
+
+Se usan asi mismo en los nodos.
+
+Para revisar el estado del servicio:
+systemctl status pcsd
+
+Ejemplo:
+sudo systemctl enable pcsd
+sudo systemctl start pcsd
+
+
+
+4) Configurar la contraseña del usuario del cluster en ambos servidores
+
+Comando:
+sudo passwd <USUARIO_CLUSTER>
+
+Que va en cada parte:
+<USUARIO_CLUSTER> es el usuario de sistema que se usa para administrar el cluster.
+
+Como obtengo ese dato en Linux:
+Ver usuarios del sistema:
+getent passwd
+
+Ver tu usuario actual (referencia):
+whoami
+
+Ejemplo con datos inventados:
+sudo passwd clusteradmin
+
+
+
+5) Permitir la comunicacion del cluster en el firewall en ambos servidores
+
+Comandos:
+sudo firewall-cmd --permanent --add-service=high-availability
+sudo firewall-cmd --reload
+
+Se ejecutan igual en cada nodo.
+
+Para ver los servicios permitidos:
+sudo firewall-cmd --list-services
+
+Ejemplo:
+sudo firewall-cmd --permanent --add-service=high-availability
+sudo firewall-cmd --reload
+
+
+
+6) Autenticar los nodos del cluster desde el servidor principal
+
+Comando:
+sudo pcs cluster auth <IP_NODO_1> <IP_NODO_2> -u <USUARIO_CLUSTER>
+
+Que va en cada parte:
+<IP_NODO_1>  -> IP del primer nodo del cluster
+<IP_NODO_2>  -> IP del segundo nodo
+<USUARIO_CLUSTER> -> usuario que se usa para la autenticacion (el mismo que configuraste con passwd)
+
+Como obtengo esos datos:
+Ver IPs de las interfaces:
+ip a
+o:
+nmcli device show
+
+Ver el usuario actual:
+whoami
+
+Ejemplo con datos inventados:
+sudo pcs cluster auth 10.10.0.11 10.10.0.12 -u clusteradmin
+
+
+
+7) Autenticar los hosts del cluster
+
+Comando:
+sudo pcs host auth <IP_NODO_1> <IP_NODO_2> -u <USUARIO_CLUSTER>
+
+Que va en cada parte:
+<IP_NODO_1> y <IP_NODO_2> -> IPs de los nodos
+<USUARIO_CLUSTER> -> usuario usado por pcs para conectarse a los nodos
+
+Como obtengo esos datos:
+Ver IPs:
+ip a
+
+Ver conexiones guardadas:
+nmcli con show
+
+Ejemplo con datos inventados:
+sudo pcs host auth 10.10.0.11 10.10.0.12 -u clusteradmin
+
+
+
+8) Crear el cluster y asignar un nombre (solo en un servidor)
+
+Comando:
+sudo pcs cluster setup <NOMBRE_CLUSTER> <IP_NODO_1> <IP_NODO_2>
+
+Que va en cada parte:
+<NOMBRE_CLUSTER> -> nombre logico del cluster
+<IP_NODO_1> y <IP_NODO_2> -> IPs de los nodos que participan en el cluster
+
+Como obtengo esos datos:
+Ver nombre del equipo:
+hostnamectl
+
+Ver IPs:
+ip a
+
+Ejemplo con datos inventados:
+sudo pcs cluster setup cluster-produccion 10.10.0.11 10.10.0.12
+
+
+
+9) Habilitar e iniciar el cluster en todos los nodos
+
+Comandos:
+sudo pcs cluster enable --all
+sudo pcs cluster start --all
+
+Se ejecutan tal cual, sin parametros extra.
+
+Para ver informacion general del cluster:
+sudo pcs status
+
+Ejemplo:
+sudo pcs cluster enable --all
+sudo pcs cluster start --all
+
+
+
+10) Ver el estado del cluster (en cualquiera de los nodos)
+
+Comando:
+sudo pcs status
+
+Muestra nodos, recursos y estado general.
+
+Ejemplo:
+sudo pcs status
+
+
+
+11) Deshabilitar STONITH (opcional)
+
+Comando:
+sudo pcs property set stonith-enabled=false
+
+Para ver las propiedades actuales del cluster:
+sudo pcs property show
+
+Ejemplo:
+sudo pcs property set stonith-enabled=false
+
+
+
+12) Crear la IP virtual (flotante) del cluster (solo en un servidor)
+
+Comando:
+sudo pcs resource create <NOMBRE_RECURSO_IP> ocf:heartbeat:IPaddr2 ip=<IP_VIRTUAL> cidr_netmask=<MASCARA_CIDR> op monitor interval=<INTERVALO_SEGUNDOS>s
+
+Que va en cada parte:
+<NOMBRE_RECURSO_IP> -> nombre interno del recurso de IP dentro del cluster
+<IP_VIRTUAL>        -> IP flotante que se movera entre nodos
+<MASCARA_CIDR>      -> mascara en formato CIDR (ej. 24)
+<INTERVALO_SEGUNDOS> -> cada cuantos segundos se monitorea el recurso
+
+Como obtengo esos datos:
+Ver red y mascara de la interfaz:
+ip a
+
+Si tienes ipcalc, puedes revisar la mascara:
+ipcalc 10.10.0.50/24
+
+Ejemplo con datos inventados:
+sudo pcs resource create IP_Flotante_Web ocf:heartbeat:IPaddr2 ip=10.10.0.50 cidr_netmask=24 op monitor interval=20s
+
+
+
+13) Probar la IP virtual desde la maquina host
+
+Comando:
+ping -t <IP_VIRTUAL>
+
+Que va en cada parte:
+<IP_VIRTUAL> es la misma IP flotante configurada en el recurso del cluster.
+
+Como confirmo esa IP en el cluster:
+sudo pcs resource show
+
+Ejemplo con datos inventados:
+ping -t 10.10.0.50
+
+====================================Práctica 3=======================================
+
+1) Instalar servidor web Apache en ambos nodos
+
+Comando:
+sudo dnf install httpd
+
+Que hace:
+Instala el paquete del servidor web Apache en cada servidor RHEL.
+
+Como verificar/relacionado en la maquina:
+Ver si el paquete esta instalado:
+rpm -qa | grep httpd
+
+Ejemplo con datos inventados:
+sudo dnf install httpd
+
+
+
+2) Instalar keepalived en ambos nodos
+
+Comando:
+sudo dnf install keepalived
+
+Que hace:
+Instala el servicio keepalived en cada servidor para manejar la IP flotante y VRRP.
+
+Como verificar/relacionado:
+Ver si keepalived esta instalado:
+rpm -qa | grep keepalived
+
+Ejemplo:
+sudo dnf install keepalived
+
+
+
+3) Habilitar y arrancar Apache y keepalived
+
+Comandos:
+sudo systemctl enable httpd && sudo systemctl start httpd
+sudo systemctl enable keepalived && sudo systemctl start keepalived
+
+Que hacen:
+Habilitan y arrancan los servicios httpd y keepalived para que inicien ahora y en cada arranque.
+
+Como verificar:
+Ver estado de Apache:
+systemctl status httpd
+Ver estado de keepalived:
+systemctl status keepalived
+
+Ejemplo:
+sudo systemctl enable httpd && sudo systemctl start httpd
+sudo systemctl enable keepalived && sudo systemctl start keepalived
+
+
+
+4) Crear pagina index.html en cada servidor
+
+Comando:
+sudo nano /var/www/html/index.html
+
+Que hace:
+Abre el archivo index.html del DocumentRoot de Apache para editar el contenido de la pagina principal.
+
+Como verificar ruta:
+Listar el contenido del directorio web:
+ls -l /var/www/html
+
+Ejemplo de contenido en el servidor 1:
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+  <h1>Este es el servidor 1</h1>
+</body>
+</html>
+
+Ejemplo de contenido en el servidor 2:
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+  <h1>Este es el servidor 2</h1>
+</body>
+</html>
+
+
+
+5) Abrir puerto 80 y protocolo VRRP en el firewall de ambos nodos
+
+Comandos:
+sudo firewall-cmd --permanent --add-port=80/tcp --zone=public && sudo firewall-cmd --permanent --add-protocol=vrrp --zone=public
+sudo firewall-cmd --reload
+
+Que hacen:
+Permiten el trafico HTTP en el puerto 80/TCP y el protocolo VRRP en la zona public, luego recargan la configuracion del firewall.
+
+Como verificar:
+Ver servicios y puertos activos:
+sudo firewall-cmd --list-all
+
+Ejemplo:
+sudo firewall-cmd --permanent --add-port=80/tcp --zone=public && sudo firewall-cmd --permanent --add-protocol=vrrp --zone=public
+sudo firewall-cmd --reload
+
+
+
+6) Configurar la escucha del puerto 80 en Apache
+
+Comando:
+sudo nano /etc/httpd/conf/httpd.conf
+
+Linea relevante dentro del archivo:
+Listen *:80
+
+Que hace:
+Define que Apache escuche en el puerto 80 en todas las interfaces.
+
+Como verificar:
+Buscar la linea Listen en el archivo:
+grep -n "^Listen" /etc/httpd/conf/httpd.conf
+
+Ejemplo de linea:
+Listen *:80
+
+
+
+7) Editar el archivo de configuracion de keepalived en ambos servidores
+
+Comando para editar:
+sudo nano /etc/keepalived/keepalived.conf
+
+Contenido generico para el servidor 1 (valores sensibles limpiados):
+
+global_defs {
+    router_id <ROUTER_ID_SERVIDOR_1>
+}
+vrrp_script check_service {
+    script "/usr/bin/killall -0 httpd"  # Cambia segun el servicio
+    interval 2
+    weight 2
+}
+
+vrrp_instance VI_1 {
+    state BACKUP
+    interface <INTERFAZ_RED_PRINCIPAL>
+    virtual_router_id <ID_ROUTER_VRRP>
+    priority <PRIORIDAD_SERVIDOR_1>
+    advert_int 1
+
+    authentication {
+        auth_type PASS
+        auth_pass <CLAVE_VRRP>
+    }
+    virtual_ipaddress {
+        <IP_VIRTUAL>/24
+    }
+
+    track_script {
+        check_service
+    }
+}
+
+Contenido generico para el servidor 2:
+
+global_defs {
+    router_id <ROUTER_ID_SERVIDOR_2>
+}
+vrrp_script check_service {
+    script "/usr/bin/killall -0 httpd"  # Cambia segun el servicio
+    interval 2
+    weight 2
+}
+
+vrrp_instance VI_1 {
+    state BACKUP
+    interface <INTERFAZ_RED_PRINCIPAL>
+    virtual_router_id <ID_ROUTER_VRRP>
+    priority <PRIORIDAD_SERVIDOR_2>
+    advert_int 1
+
+    authentication {
+        auth_type PASS
+        auth_pass <CLAVE_VRRP>
+    }
+    virtual_ipaddress {
+        <IP_VIRTUAL>/24
+    }
+
+    track_script {
+        check_service
+    }
+}
+
+Que va en cada parte principal:
+<ROUTER_ID_SERVIDOR_1>  -> identificador del router/nodo 1 (por ejemplo un nombre corto del servidor).
+<ROUTER_ID_SERVIDOR_2>  -> identificador del router/nodo 2.
+<INTERFAZ_RED_PRINCIPAL> -> interfaz de red que usa el servidor (ens160, enp0s3, etc.).
+<ID_ROUTER_VRRP>        -> numero de router virtual VRRP (debe ser el mismo en ambos nodos).
+<PRIORIDAD_SERVIDOR_1>  -> prioridad numerica del nodo 1 (mas alta para el que queras que sea preferido).
+<PRIORIDAD_SERVIDOR_2>  -> prioridad numerica del nodo 2 (mas baja que la del nodo principal).
+<CLAVE_VRRP>            -> clave de autenticacion para VRRP.
+<IP_VIRTUAL>            -> direccion IP flotante compartida por los dos nodos.
+
+Como obtengo esos datos en Linux:
+Ver interfaces de red:
+ip a
+o:
+nmcli device show
+
+Ver el nombre (hostname) del servidor (para usar algo similar como router_id):
+hostnamectl
+
+Ver direccion IP de la red donde colocaras la IP flotante:
+ip a
+
+Ejemplo inventado para el servidor 1:
+global_defs {
+    router_id WEBNODE1
+}
+vrrp_script check_service {
+    script "/usr/bin/killall -0 httpd"
+    interval 2
+    weight 2
+}
+
+vrrp_instance VI_1 {
+    state BACKUP
+    interface ens192
+    virtual_router_id 51
+    priority 150
+    advert_int 1
+
+    authentication {
+        auth_type PASS
+        auth_pass ClaveVRRP2025
+    }
+    virtual_ipaddress {
+        10.20.30.200/24
+    }
+
+    track_script {
+        check_service
+    }
+}
+
+Ejemplo inventado para el servidor 2:
+global_defs {
+    router_id WEBNODE2
+}
+vrrp_script check_service {
+    script "/usr/bin/killall -0 httpd"
+    interval 2
+    weight 2
+}
+
+vrrp_instance VI_1 {
+    state BACKUP
+    interface ens192
+    virtual_router_id 51
+    priority 100
+    advert_int 1
+
+    authentication {
+        auth_type PASS
+        auth_pass ClaveVRRP2025
+    }
+    virtual_ipaddress {
+        10.20.30.200/24
+    }
+
+    track_script {
+        check_service
+    }
+}
+
+
+
+8) Reiniciar servicios de Apache y keepalived en cada servidor
+
+Comandos:
+sudo systemctl restart httpd
+sudo systemctl restart keepalived.service
+
+Que hacen:
+Reinician Apache y keepalived para aplicar los cambios de configuracion.
+
+Como verificar:
+Ver estado de ambos servicios:
+systemctl status httpd
+systemctl status keepalived
+
+Ejemplo:
+sudo systemctl restart httpd
+sudo systemctl restart keepalived.service
+
+
+
+9) Probar IP flotante desde el host
+
+Acciones:
+1. Hacer ping permanente a la IP flotante.
+2. Probar la IP flotante en el navegador.
+
+Comando de ping con IP generica:
+ping <IP_VIRTUAL>
+
+Que va en cada parte:
+<IP_VIRTUAL> -> direccion IP flotante configurada en keepalived.
+
+Como verificar esa IP en el servidor:
+Ver configuracion de keepalived:
+sudo cat /etc/keepalived/keepalived.conf
+
+Ejemplo inventado:
+ping 10.20.30.200
+
+Si el ping se mantiene cuando apagas o reinicias el nodo principal y la pagina sigue cargando desde el backup, la alta disponibilidad esta funcionando.
+
+
+
